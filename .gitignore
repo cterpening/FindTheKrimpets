@@ -1,0 +1,11 @@
+/.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+/.pytest_cache/
+/browser_profile/
+/.playwright/
+/.vscode/
+/.idea/

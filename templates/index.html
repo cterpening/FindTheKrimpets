@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Find The Krimpets</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="bg-orbit"></div>
+    <div class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Local Stock Radar</p>
+          <h1>Find The Krimpets</h1>
+          <p class="subhead">
+            Quick, multi-retailer scans for Butterscotch Krimpets and Vanilla Coke Zero.
+          </p>
+        </div>
+        <div class="card config">
+          <div class="config-line">
+            <span class="label">ZIP</span>
+            <span class="value">{{ zip_code }}</span>
+          </div>
+          <div class="config-line">
+            <span class="label">Radius</span>
+            <span class="value">{{ radius_miles }} miles</span>
+          </div>
+          <div class="config-line">
+            <span class="label">Mode</span>
+            <span class="value">{{ "Headless" if headless else "Browser" }}</span>
+          </div>
+          <div class="config-line">
+            <span class="label">Products</span>
+            <span class="value mono">{{ products | join(", ") }}</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="card setup">
+        <h2>One-time location setup</h2>
+        <p>
+          Some retailers require a stored location. Run <span class="mono">python setup_location.py</span>
+          to set ZIP/store once, then the checker can reuse that profile.
+        </p>
+      </section>
+
+      <section class="card form-card">
+        <h2>Scan settings</h2>
+        <p class="small">
+          ZIP/radius apply to the scan, but most retailers still rely on saved profile locations from the setup step.
+        </p>
+        <form class="scan-form" method="post">
+          <label>
+            ZIP code
+            <input name="zip_code" type="text" value="{{ zip_code }}" />
+          </label>
+          <label>
+            Radius (miles)
+            <input name="radius_miles" type="number" min="1" max="250" value="{{ radius_miles }}" />
+          </label>
+          <label>
+            Products (comma or new line)
+            <textarea name="products" rows="3">{{ products | join("\n") }}</textarea>
+          </label>
+          <label class="checkbox">
+            <input name="headless" type="checkbox" {% if headless %}checked{% endif %} />
+            Run headless (no browser window)
+          </label>
+          <label>
+            Slow mode (ms delay per page)
+            <input name="slow_mode_ms" type="number" min="0" max="10000" value="{{ slow_mode_ms }}" />
+          </label>
+          <label class="checkbox">
+            <input name="include_stores" type="checkbox" {% if include_stores %}checked{% endif %} />
+            Include store locator results
+          </label>
+          <div class="retailers">
+            <p class="label">Retailers</p>
+            <div class="retailer-grid">
+              {% for retailer in retailers %}
+              <label class="checkbox">
+                <input
+                  name="retailers"
+                  type="checkbox"
+                  value="{{ retailer.name }}"
+                  {% if retailer.name in enabled_retailers %}checked{% endif %}
+                />
+                {{ retailer.name }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          <button class="cta" type="submit">Run inventory scan</button>
+        </form>
+        <p class="hint">Last refresh: {{ now.strftime("%Y-%m-%d %H:%M") }}</p>
+        {% if results %}
+        <a class="link" href="/export.csv">Export CSV</a>
+        {% if include_stores %}
+        <a class="link" href="/stores.csv">Export store CSV</a>
+        {% endif %}
+        {% endif %}
+      </section>
+
+      {% if run_error %}
+      <section class="card error">
+        <h3>Run error</h3>
+        <p class="mono">{{ run_error }}</p>
+      </section>
+      {% endif %}
+
+      {% if results %}
+      <section class="results">
+        <div class="results-head">
+          <h2>Scan results</h2>
+          <p class="note">Sorted by likely availability. Always confirm before driving out.</p>
+        </div>
+        <div class="table inventory">
+          <div class="row header">
+            <div>Retailer</div>
+            <div>Product</div>
+            <div>Status</div>
+            <div>Confidence</div>
+            <div>Notes</div>
+            <div>Link</div>
+          </div>
+          {% for row in results %}
+          <div class="row">
+            <div class="retailer">{{ row.retailer }}</div>
+            <div>{{ row.product }}</div>
+            <div><span class="badge {{ row.status | lower }}">{{ row.status }}</span></div>
+            <div class="mono">{{ row.confidence | upper }}</div>
+            <div class="small">
+              {{ row.details }}<br />
+              <span class="muted">{{ row.location_notes }}</span>
+            </div>
+            <div><a href="{{ row.url }}" target="_blank" rel="noreferrer">Open</a></div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if stores %}
+      <section class="results">
+        <div class="results-head">
+          <h2>Nearby stores</h2>
+          <p class="note">Distances are shown relative to ZIP {{ zip_code }} when available.</p>
+        </div>
+        <div class="table stores">
+          <div class="row header">
+            <div>Retailer</div>
+            <div>Store</div>
+            <div>Address</div>
+            <div>Distance</div>
+            <div>Link</div>
+          </div>
+          {% for row in stores %}
+          <div class="row">
+            <div class="retailer">{{ row.retailer }}</div>
+            <div>{{ row.store_name }}</div>
+            <div class="small">{{ row.address }}</div>
+            <div class="mono">{{ row.distance }}</div>
+            <div><a href="{{ row.store_url }}" target="_blank" rel="noreferrer">Open</a></div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if run_history %}
+      <section class="card history">
+        <h2>Recent scans</h2>
+        <div class="history-list">
+          {% for run in run_history %}
+          <div class="history-row">
+            <div>
+              <strong>Run {{ run.id }}</strong>
+              <div class="small">
+                {{ run.run_at.strftime("%Y-%m-%d %H:%M") }} | ZIP {{ run.params.zip_code }} | {{ run.params.radius_miles }} mi
+              </div>
+            </div>
+            <div class="history-links">
+              <a class="link" href="/export.csv?run_id={{ run.id }}">Inventory CSV</a>
+              {% if run.stores %}
+              <a class="link" href="/stores.csv?run_id={{ run.id }}">Stores CSV</a>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      <footer class="footer">
+        <p class="mono">Defaults live in <span class="mono">config.py</span>.</p>
+      </footer>
+    </div>
+  </body>
+</html>
