@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional
+from urllib.parse import urljoin
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -165,13 +166,13 @@ def _pick_first(locator, selectors: str) -> str:
     return ""
 
 
-def _pick_first_link(locator, selectors: str) -> str:
+def _pick_first_link(locator, selectors: str, base_url: str) -> str:
     for selector in [s.strip() for s in selectors.split(",") if s.strip()]:
         item = locator.locator(selector)
         if item.count() > 0:
             href = item.first.get_attribute("href")
             if href:
-                return href
+                return urljoin(base_url, href)
     return ""
 
 
@@ -221,7 +222,7 @@ def find_stores(
                         store_name = _pick_first(card, locator.name_selector) or locator.name
                         address = _pick_first(card, locator.address_selector)
                         distance = _pick_first(card, locator.distance_selector)
-                        store_url = _pick_first_link(card, locator.link_selector) or url
+                        store_url = _pick_first_link(card, locator.link_selector, url) or url
                         results.append(
                             {
                                 "retailer": locator.name,

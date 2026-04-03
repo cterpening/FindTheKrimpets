@@ -56,6 +56,9 @@
         <p class="small">
           ZIP/radius apply to the scan, but most retailers still rely on saved profile locations from the setup step.
         </p>
+        {% if scan_active %}
+        <p class="status-banner">A scan is already running in this app session. Start another one after it finishes.</p>
+        {% endif %}
         <form class="scan-form" method="post">
           <label>
             ZIP code
@@ -97,14 +100,18 @@
               {% endfor %}
             </div>
           </div>
-          <button class="cta" type="submit">Run inventory scan</button>
+          <button class="cta" type="submit" {% if scan_active %}disabled{% endif %}>
+            {{ "Scan in progress" if scan_active else "Run inventory scan" }}
+          </button>
         </form>
         <p class="hint">Last refresh: {{ now.strftime("%Y-%m-%d %H:%M") }}</p>
         {% if results %}
-        <a class="link" href="/export.csv">Export CSV</a>
-        {% if include_stores %}
-        <a class="link" href="/stores.csv">Export store CSV</a>
-        {% endif %}
+        <div class="link-row">
+          <a class="link" href="/export.csv">Export CSV</a>
+          {% if include_stores %}
+          <a class="link" href="/stores.csv">Export store CSV</a>
+          {% endif %}
+        </div>
         {% endif %}
       </section>
 
@@ -132,15 +139,15 @@
           </div>
           {% for row in results %}
           <div class="row">
-            <div class="retailer">{{ row.retailer }}</div>
-            <div>{{ row.product }}</div>
-            <div><span class="badge {{ row.status | lower }}">{{ row.status }}</span></div>
-            <div class="mono">{{ row.confidence | upper }}</div>
-            <div class="small">
+            <div class="cell" data-label="Retailer"><span class="retailer">{{ row.retailer }}</span></div>
+            <div class="cell" data-label="Product">{{ row.product }}</div>
+            <div class="cell" data-label="Status"><span class="badge {{ row.status | lower }}">{{ row.status }}</span></div>
+            <div class="cell mono" data-label="Confidence">{{ row.confidence | upper }}</div>
+            <div class="cell small" data-label="Notes">
               {{ row.details }}<br />
               <span class="muted">{{ row.location_notes }}</span>
             </div>
-            <div><a href="{{ row.url }}" target="_blank" rel="noreferrer">Open</a></div>
+            <div class="cell" data-label="Link"><a href="{{ row.url }}" target="_blank" rel="noreferrer">Open</a></div>
           </div>
           {% endfor %}
         </div>
@@ -163,11 +170,11 @@
           </div>
           {% for row in stores %}
           <div class="row">
-            <div class="retailer">{{ row.retailer }}</div>
-            <div>{{ row.store_name }}</div>
-            <div class="small">{{ row.address }}</div>
-            <div class="mono">{{ row.distance }}</div>
-            <div><a href="{{ row.store_url }}" target="_blank" rel="noreferrer">Open</a></div>
+            <div class="cell" data-label="Retailer"><span class="retailer">{{ row.retailer }}</span></div>
+            <div class="cell" data-label="Store">{{ row.store_name }}</div>
+            <div class="cell small" data-label="Address">{{ row.address }}</div>
+            <div class="cell mono" data-label="Distance">{{ row.distance }}</div>
+            <div class="cell" data-label="Link"><a href="{{ row.store_url }}" target="_blank" rel="noreferrer">Open</a></div>
           </div>
           {% endfor %}
         </div>

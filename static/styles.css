@@ -183,9 +183,32 @@ h1 {
   box-shadow: 0 20px 40px rgba(15, 111, 133, 0.35);
 }
 
+.cta:disabled {
+  cursor: wait;
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
+
 .hint {
   color: var(--slate);
   margin-top: 12px;
+}
+
+.status-banner {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 111, 133, 0.08);
+  border: 1px solid rgba(15, 111, 133, 0.16);
+  color: var(--ocean);
+  font-weight: 600;
+}
+
+.link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .link {
@@ -283,6 +306,14 @@ h1 {
   color: var(--slate);
 }
 
+.cell {
+  min-width: 0;
+}
+
+.retailer {
+  font-weight: 700;
+}
+
 .muted {
   color: rgba(47, 59, 69, 0.7);
 }
@@ -327,6 +358,7 @@ h1 {
   .row {
     grid-template-columns: 1fr;
     align-items: start;
+    gap: 8px;
   }
 
   .row.header {
@@ -336,5 +368,37 @@ h1 {
   .results-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .page {
+    padding: 28px 16px 40px;
+  }
+
+  .card {
+    padding: 18px 16px;
+  }
+
+  .config-line,
+  .history-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cell {
+    display: grid;
+    gap: 4px;
+  }
+
+  .cell::before {
+    content: attr(data-label);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(47, 59, 69, 0.7);
+    font-weight: 700;
+  }
+
+  .history-links {
+    flex-wrap: wrap;
   }
 }

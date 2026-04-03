@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import csv
+from contextlib import contextmanager
 from datetime import datetime
 from io import StringIO
+import os
+from threading import Lock
 from typing import List, Optional
 
 from flask import Flask, Response, render_template, request
@@ -18,6 +21,8 @@ LAST_STORES: List[dict] | None = None
 LAST_PARAMS: dict | None = None
 RUN_HISTORY: List[dict] = []
 RUN_COUNTER = 0
+SCAN_LOCK = Lock()
+SCAN_ACTIVE = False
 
 
 def _parse_products(text: str) -> List[str]:
@@ -70,9 +75,26 @@ def _find_run(run_id: Optional[int]) -> Optional[dict]:
     return None
 
 
+@contextmanager
+def _scan_session():
+    global SCAN_ACTIVE
+
+    acquired = SCAN_LOCK.acquire(blocking=False)
+    if not acquired:
+        raise RuntimeError("Another scan is already running. Wait for it to finish, then try again.")
+
+    SCAN_ACTIVE = True
+    try:
+        yield
+    finally:
+        SCAN_ACTIVE = False
+        SCAN_LOCK.release()
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     global LAST_RESULTS
+    global LAST_STORES
     global LAST_PARAMS
 
     results = None
@@ -107,39 +129,40 @@ def index():
             enabled_retailers = selected
 
         try:
-            results = checker.run_checks(
-                zip_code=zip_code,
-                radius_miles=radius_miles,
-                products=products,
-                headless=headless,
-                enabled_retailers=enabled_retailers,
-                slow_mode_ms=slow_mode_ms,
-            )
-            results = _sort_results(results)
-            LAST_RESULTS = results
-            LAST_STORES = None
-            LAST_PARAMS = {
-                "zip_code": zip_code,
-                "radius_miles": radius_miles,
-                "products": products,
-                "headless": headless,
-                "enabled_retailers": enabled_retailers,
-                "slow_mode_ms": slow_mode_ms,
-                "include_stores": include_stores,
-                "store_limit": store_limit,
-            }
-            if include_stores:
-                stores = store_locator.find_stores(
+            with _scan_session():
+                results = checker.run_checks(
                     zip_code=zip_code,
                     radius_miles=radius_miles,
-                    enabled_retailers=enabled_retailers,
+                    products=products,
                     headless=headless,
+                    enabled_retailers=enabled_retailers,
                     slow_mode_ms=slow_mode_ms,
-                    limit_per_retailer=store_limit,
                 )
-                LAST_STORES = stores
+                results = _sort_results(results)
+                LAST_RESULTS = results
+                LAST_STORES = None
+                LAST_PARAMS = {
+                    "zip_code": zip_code,
+                    "radius_miles": radius_miles,
+                    "products": products,
+                    "headless": headless,
+                    "enabled_retailers": enabled_retailers,
+                    "slow_mode_ms": slow_mode_ms,
+                    "include_stores": include_stores,
+                    "store_limit": store_limit,
+                }
+                if include_stores:
+                    stores = store_locator.find_stores(
+                        zip_code=zip_code,
+                        radius_miles=radius_miles,
+                        enabled_retailers=enabled_retailers,
+                        headless=headless,
+                        slow_mode_ms=slow_mode_ms,
+                        limit_per_retailer=store_limit,
+                    )
+                    LAST_STORES = stores
 
-            _record_run(LAST_PARAMS, results, LAST_STORES)
+                _record_run(LAST_PARAMS, results, LAST_STORES)
         except Exception as exc:  # noqa: BLE001 - surface unexpected errors
             run_error = f"{type(exc).__name__}: {exc}"
 
@@ -158,6 +181,7 @@ def index():
         retailers=retailers,
         enabled_retailers=enabled_retailers,
         stores=stores,
+        scan_active=SCAN_ACTIVE,
         run_history=list(reversed(RUN_HISTORY[-5:])),
     )
 
@@ -230,4 +254,4 @@ def export_stores_csv() -> Response:
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=True)

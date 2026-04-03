@@ -40,6 +40,7 @@ class Retailer:
     in_stock_phrases: List[str] = field(default_factory=list)
     out_of_stock_phrases: List[str] = field(default_factory=list)
     no_results_phrases: List[str] = field(default_factory=list)
+    in_stock_containers: List[str] = field(default_factory=list)
 
 
 def build_retailers() -> List[Retailer]:
@@ -52,6 +53,7 @@ def build_retailers() -> List[Retailer]:
             notes="Set your store/ZIP in the site UI first.",
             in_stock_selectors=["button:has-text('Add to Cart')"],
             no_results_phrases=["no results"],
+            in_stock_containers=["main", "[data-testid='product-grid']", ".product-grid"],
         ),
         Retailer(
             name="Kroger",
@@ -61,6 +63,7 @@ def build_retailers() -> List[Retailer]:
             notes="Set your store/ZIP in the site UI first.",
             in_stock_selectors=["button:has-text('Add to Cart')"],
             no_results_phrases=["no results", "we couldn't find"],
+            in_stock_containers=["main", "[data-testid='AutoGrid']", ".AutoGrid"],
         ),
         Retailer(
             name="Target",
@@ -71,6 +74,7 @@ def build_retailers() -> List[Retailer]:
             in_stock_selectors=["[data-test='addToCartButton']", "button:has-text('Add to cart')"],
             out_of_stock_selectors=["[data-test='productNotAvailable']"],
             no_results_phrases=["we found 0 results"],
+            in_stock_containers=["main", "[data-test='@web/site-top-of-funnel/ProductCardWrapper']", "[data-test='product-details']"],
         ),
         Retailer(
             name="Walmart",
@@ -81,6 +85,7 @@ def build_retailers() -> List[Retailer]:
             in_stock_selectors=["button:has-text('Add to cart')"],
             out_of_stock_selectors=["text=Out of stock"],
             no_results_phrases=["no results"],
+            in_stock_containers=["main", "[data-testid='item-stack']", "[data-testid='search-results']"],
         ),
         Retailer(
             name="Dollar General",
@@ -90,6 +95,7 @@ def build_retailers() -> List[Retailer]:
             notes="Set your store/ZIP in the site UI first.",
             in_stock_selectors=["button:has-text('Add to Cart')"],
             no_results_phrases=["no results"],
+            in_stock_containers=["main", ".products-grid", ".search-results"],
         ),
         Retailer(
             name="Walgreens",
@@ -100,6 +106,7 @@ def build_retailers() -> List[Retailer]:
             in_stock_selectors=["button:has-text('Add to cart')"],
             out_of_stock_selectors=["text=Out of stock"],
             no_results_phrases=["we found 0 results"],
+            in_stock_containers=["main", "#omni-results", ".product-container"],
         ),
         Retailer(
             name="CVS",
@@ -110,6 +117,7 @@ def build_retailers() -> List[Retailer]:
             in_stock_selectors=["button:has-text('Add to cart')"],
             out_of_stock_selectors=["text=Out of stock"],
             no_results_phrases=["0 results", "no results"],
+            in_stock_containers=["main", "[data-testid='product-grid']", ".css-1dbjc4n"],
         ),
         Retailer(
             name="Aldi",
@@ -118,6 +126,7 @@ def build_retailers() -> List[Retailer]:
             location_mode="profile",
             notes="Set your store/ZIP in the site UI first.",
             no_results_phrases=["no results"],
+            in_stock_containers=["main", ".cmp-results", ".mod-search-results"],
         ),
         Retailer(
             name="Costco",
@@ -127,6 +136,7 @@ def build_retailers() -> List[Retailer]:
             notes="Set your warehouse/ZIP in the site UI first.",
             in_stock_selectors=["input#add-to-cart", "button:has-text('Add to Cart')"],
             out_of_stock_selectors=["text=Out of stock"],
+            in_stock_containers=["main", "#search-results", ".product-list"],
         ),
         Retailer(
             name="Sam's Club",
@@ -136,6 +146,7 @@ def build_retailers() -> List[Retailer]:
             notes="Set your club/ZIP in the site UI first.",
             in_stock_selectors=["button:has-text('Add to cart')"],
             out_of_stock_selectors=["text=Out of stock"],
+            in_stock_containers=["main", "#idSearchResults", ".sc-product-card"],
         ),
         Retailer(
             name="Whole Foods",
@@ -145,6 +156,7 @@ def build_retailers() -> List[Retailer]:
             notes="Set your store/ZIP in the site UI first.",
             in_stock_phrases=["add to cart"],
             no_results_phrases=["no results"],
+            in_stock_containers=["main", ".views-row", ".search-results"],
         ),
         Retailer(
             name="Giant Eagle",
@@ -154,6 +166,7 @@ def build_retailers() -> List[Retailer]:
             notes="Set your store/ZIP in the site UI first.",
             in_stock_selectors=["button:has-text('Add to cart')"],
             no_results_phrases=["no results"],
+            in_stock_containers=["main", ".product-grid", ".search-results"],
         ),
         Retailer(
             name="Amazon",
@@ -164,6 +177,7 @@ def build_retailers() -> List[Retailer]:
             in_stock_selectors=["input#add-to-cart-button"],
             out_of_stock_selectors=["text=Currently unavailable"],
             blocked_selectors=["text=Type the characters you see"],
+            in_stock_containers=["main", "[data-component-type='s-search-results']", "#search"],
         ),
     ]
 
@@ -185,6 +199,22 @@ def _first_phrase_hit(text: str, phrases: Iterable[str]) -> Optional[str]:
     return None
 
 
+def _page_text(page, selectors: Iterable[str]) -> str:
+    for selector in selectors:
+        try:
+            locator = page.locator(selector)
+            if locator.count() > 0:
+                text = locator.first.inner_text().lower()
+                if text:
+                    return text
+        except Exception:
+            continue
+    try:
+        return page.inner_text("main").lower()
+    except Exception:
+        return page.inner_text("body").lower()
+
+
 def _signal_confidence(signal_type: Optional[str]) -> str:
     if signal_type == "selector":
         return "high"
@@ -195,6 +225,7 @@ def _signal_confidence(signal_type: Optional[str]) -> str:
 
 def _status_from_retailer(page, retailer: Retailer) -> Tuple[str, str, str]:
     text = page.inner_text("body").lower()
+    focused_text = _page_text(page, retailer.in_stock_containers)
 
     selector_hit = _first_selector_hit(page, retailer.blocked_selectors)
     phrase_hit = _first_phrase_hit(text, ["access denied", "verify you are a human", "captcha", "unusual traffic"])
@@ -220,13 +251,12 @@ def _status_from_retailer(page, retailer: Retailer) -> Tuple[str, str, str]:
         return "OUT_OR_NOT_LISTED", f"Matched no-results signal ({selector_hit or phrase_hit}).", _signal_confidence(signal_type)
 
     selector_hit = _first_selector_hit(page, retailer.in_stock_selectors)
-    phrase_hit = _first_phrase_hit(text, retailer.in_stock_phrases + [
+    phrase_hit = _first_phrase_hit(focused_text, retailer.in_stock_phrases + [
         "add to cart",
         "pickup",
         "delivery",
         "ship it",
         "in stock",
-        "available",
     ])
     if selector_hit or phrase_hit:
         signal_type = "selector" if selector_hit else "phrase"
